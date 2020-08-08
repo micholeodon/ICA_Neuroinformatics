@@ -53,6 +53,12 @@ Using this dataset we will see also:
 
 We will be working with the script, however beginners may find it useful to start with the GUI and complete the introductory tutorial to the EEGLAB - https://sccn.ucsd.edu/wiki/Getting_Started .
 
+** PRELIMINARIES
+
+You need to have EEGLAB toolbox installed (version 2019 recommended)!
+You can download it [here][https://sccn.ucsd.edu/eeglab/downloadtoolbox.php/download.php]. 
+Unpack it into `eeglab2019_1` directory inside project root directory.
+
 Start as usual by clearing the workspace, providing path to EEGLAB and starting it:
 
 #+NAME: start
