@@ -1,0 +1,384 @@
+#+TITLE: ICA in Neuroinformatics Example
+#+AUTHOR: Michał Konrad Komorowski
+#+EMAIL: michu.kom AT gmail DOT com
+#+LANGUAGE:  en
+#+OPTIONS:   H:3 num:nil toc:t \n:nil ::t |:t ^:nil  -:t f:t *:t tex:t d:nil tags:not-in-toc author:t email:t creator:nil ':t timestamp:nil
+#+INFOJS_OPT: view:nil toc:nil ltoc:t tdepth:1 mouse:underline buttons:0 
+
+
+* Goal
+
+We will see how ICA works on the real EEG signal and how ICA can be used to remove some types of artifacts present in the signal. Artifact rejection is crucial part of discovering knowledge from the data. 
+
+We will see 32-channel EEG recording sampled at 128 Hz sampling rate. Channel names are refering to the most widely used 10-20 system for electrode placement. Odd numbers designate left hemisphere, even numbers are on the right hemisphere. Letters corespond to different brain lobes, e.g. F - frontal lobe, O - occipital lobe.
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_chanlocs.png]]
+
+
+Below is more detailed description of the dataset.
+
+#+begin_quote
+-----
+EEGLAB Tutorial Dataset                              
+                                                     
+During this selective visual attention experiment,   
+stimuli appeared briefly in any of five squares      
+arrayed horizontally above a central fixation cross. 
+In each experimental block, one (target) box was     
+differently colored from the rest Whenever a square  
+appeared in the target box the subject was asked to  
+respond quickly with a right thumb button press. If  
+the stimulus was a circular disk, he was asked to    
+ignore it. (Reference: Makeig et al.. J. Neurosci.   
+19:2665-80, 1999)                                    
+                                                     
+These data were constructed by concatenating         
+three-second epochs from one subject, each containing
+a target square in the attended location ('square'   
+events, left-hemifield locations 1 or 2 only)        
+followed by a button response ('rt' events).
+-----
+#+end_quote
+
+
+Using this dataset We will see also:
+- that changing the order of the channels does not matter for the ICA
+- even changing the order of samples does not matter (only if each channel's samples will be reordered in the same way)
+- if you mix sample order in each channel differently you will ruin all the temporal relations between eeg signal channels
+
+  
+* Basic ICA procedure
+
+We will be working with the script, however beginners may find it useful to start with the GUI and complete the introductory tutorial to the EEGLAB - https://sccn.ucsd.edu/wiki/Getting_Started .
+
+Start as usual by clearing the workspace, providing path to EEGLAB and starting it:
+
+#+NAME: start
+#+BEGIN_SRC matlab :tangle 00_file.m
+clear; close all; clc;
+ 
+addpath ./eeglab2019_1/
+eeglab
+#+END_SRC
+
+
+Here is the code illustration what do I mean by changing the order of channels and samples, shown on some test two-channel signal.
+
+#+NAME:  illustration
+#+BEGIN_SRC matlab   :tangle 01_file.m
+srate = 100; % sampling rate
+f = 4; % frequency of the x1 sine component
+T = 1;
+t = 0:1/srate:(T-1/srate);
+x1 = sin(2*pi*f*t);
+x2 = 0.01*t.^2;
+X = [x1 ; x2];
+
+X1 = X; % copy
+
+% uncomment to permute channel order
+% X1 = X([2 1], :);
+
+% uncomment to permute sample order (same permutation for all channels !)
+% p = randperm(size(x1,2));
+% X1 = X(:,p);
+
+subplot(2,1,1)
+plot(t, X1(1,:))
+title 'Two-channel signal'
+xlabel('Time [s]')
+ylabel('Channel 1')
+grid on
+subplot(2,1,2)
+plot(t, X1(2,:))
+xlabel('Time [s]')
+ylabel('Channel 2')
+grid on
+
+#+END_SRC
+
+Uncomment a line 12 to change the order of channels.
+Uncomment lines 15 and 16 to change the order of samples.
+
+
+Now, load the EEG signal together with the channels spatial locallization (in order to show ICs on the scalp):
+
+#+NAME:  EEG load
+#+BEGIN_SRC matlab  :tangle 02_file.m
+EEG = pop_loadset('filename','eeglab_data.set','filepath','./');
+[ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
+EEG = eeg_checkset( EEG );
+EEG = pop_chanedit(EEG, 'load',{'./eeglab_chan32.locs' 'filetype' 'autodetect'});
+EEG_raw = EEG;
+eeglab redraw
+#+END_SRC
+
+
+Let's have a look on the signal:
+#+NAME:  plot signal
+#+BEGIN_SRC matlab :tangle 03_file.m
+pop_eegplot(EEG, 1, 0 ,0);
+#+END_SRC
+
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_eeg1.png]]
+
+
+It is actually pretty nice piece of signal, however we can see few types of artifacts:
+- eye blinks
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_eeg_eye1.png]]
+
+
+- sudden non-physiological jumps
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_eeg_sudden_jump.png]]
+
+
+- high-frequency noise (probably muscle-related)
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_eeg_noise.png]]
+
+
+Now run the ICA procedure :
+#+NAME:  run ICA  
+#+BEGIN_SRC matlab :tangle 04_file.m
+EEG_1 = pop_runica(EEG, 'runica')
+EEG_1 = eeg_checkset( EEG_1 );
+setname = 'Non-permuted';
+[ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG_1, 0, 'setname', setname, 'gui', 'off');
+eeglab redraw
+#+END_SRC
+
+
+Number of independent components (ICs) are always the same as the number of your data channels.
+Let's have a look at ICs:
+
+#+NAME:  plot ICs scroll
+#+BEGIN_SRC matlab :tangle 05_file.m
+pop_eegplot( EEG_1, 0, 1, 1);
+#+END_SRC
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_IC1.png]]
+
+
+It is hard to examine EEG by looking at the scroll-plot of the ICs, however if we change the time scale (Settings -> Time range to display) and amplitude scale ('plus' button highlighted on the picture) we can make some initial conclusions, e.g. that one of the components contains isolated eye-blinks. This particular artifact is actually one of the easiest to tell apart.
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_IC2.png]]
+
+
+Let's look at the spatial representation of the components.
+
+#+NAME:  plot ICs scalps
+#+BEGIN_SRC matlab :tangle 06_file.m
+pop_selectcomps(EEG_1, [1:32] ); 
+#+END_SRC
+
+They are sorted by decreasing power.
+You can click on any button to reveal more properties.
+For example below you can se the brain component with huge spike in the spectrum:
+
+------
+*Warning!* Your component order could be slighly different as for the learning weights in the ICA algorithm are initialized randomly!
+------
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_IC_brain_plus_noise.png]]
+
+
+You should not reject such components, especially when they are one of the most powerful components, because you will endeed kill the line noise, but, sadly, together with most of the brain activity.
+
+Let's have a look on the eye blink component:
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_IC_eye_topo.png]]
+
+You can see that this component is very repetitive. Enregy at the scalp topography of that IC is concentrated and polarized near the eyes and you can also see no alpha peak in the spectrum.
+
+If you take some time you can learn how to tell components apart - https://labeling.ucsd.edu/tutorial/overview. 
+
+
+Let's reject eye-blink component and see how the signal looks after rejecton.
+
+#+NAME:  reject eye component
+#+BEGIN_SRC matlab  :tangle 07_file.m
+EEG_1 = pop_subcomp( EEG_1, [substitute by the correct number of the component], 0);
+pop_eegplot(EEG_1, 1,0,0)
+#+END_SRC
+
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_eeg_rejected_eye.png]]
+
+
+So this is a basic procedure for rejecting components. There are also so automatic classifiers available in EEGLAB.
+
+
+* Invariance of the ICA
+  
+------
+*Warning!* EEGLAB don't like when you working both in GUI and via scripting so if you are not advanced EEGLAB user, run scripts as presented below, do not mix lines. Buttons may not work for those scripts below.
+------
+
+Now, let's test if changing the order of channels would change the components.
+This is equivalent to changing the order of channels.
+#+NAME:  mix channel order
+#+BEGIN_SRC matlab :tangle 08_file.m
+close all
+
+EEG = pop_loadset('filename','eeglab_data.set','filepath','./');
+[ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
+EEG = eeg_checkset( EEG );
+EEG = pop_chanedit(EEG, 'load',{'./eeglab_chan32.locs' 'filetype' 'autodetect'});
+eeglab redraw
+
+% Unchanged
+% ICA
+EEG_1 = pop_runica(EEG, 'runica')
+EEG_1 = eeg_checkset( EEG_1 );
+
+% plot components
+EEG_1 = eeg_checkset( EEG_1 );
+
+EEG_perm = EEG;
+p = randperm(size(EEG.data,1))
+EEG_perm.data = EEG.data(p,:); % permute channels in data
+EEG_perm.chanlocs = EEG.chanlocs(p); % permute chanlocs so the IC will be displayed correctly
+
+% ICA
+EEG_2 = pop_runica(EEG_perm, 'runica')
+EEG_2 = eeg_checkset( EEG_2 );
+
+% See components
+pop_selectcomps(EEG_1, [1:32] ); 
+title 'Non-permuted';
+pop_selectcomps(EEG_2, [1:32] ); 
+title 'Permuted channel order';
+
+#+END_SRC
+
+Components are almost the same as for the learning weights in the ICA algorithm are initialized randomly. For this reason the component order could be slightly different, however you will easily match corresponding pairs.
+
+
+Now, let's test if changing the order of samples (same permutation for all channels) would change the components.
+
+#+NAME:  mix sample order
+#+BEGIN_SRC matlab :tangle 09_file.m
+close all
+
+EEG = pop_loadset('filename','eeglab_data.set','filepath','./');
+[ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
+EEG = eeg_checkset( EEG );
+EEG = pop_chanedit(EEG, 'load',{'./eeglab_chan32.locs' 'filetype' 'autodetect'});
+eeglab redraw
+
+% Unchanged
+% ICA
+EEG_1 = pop_runica(EEG, 'runica')
+EEG_1 = eeg_checkset( EEG_1 );
+
+% Permuted samples
+EEG_perm = EEG;
+p = randperm(size(EEG.data,2))
+EEG_perm.data = EEG.data(:,p);
+EEG_2 = pop_runica(EEG_perm, 'runica')
+EEG_2 = eeg_checkset( EEG_2 );
+
+pop_selectcomps(EEG_1, [1:32] );
+title 'Non-permuted';
+pop_selectcomps(EEG_2, [1:32] );
+title 'Permuted samples';
+eeglab redraw
+
+#+END_SRC
+
+Components are almost the same as for the learning weights in the ICA algorithm are initialized randomly. For this reason the component order could be slightly different, however you will easily match corresponding pairs.
+
+
+Mix sample order but now every channel will get different permutation.
+
+#+NAME:  ruin
+#+BEGIN_SRC matlab :tangle 10_file.m
+close all
+
+% load
+EEG = pop_loadset('filename','eeglab_data.set','filepath','./');
+[ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
+EEG = eeg_checkset( EEG );
+EEG = pop_chanedit(EEG, 'load',{'./eeglab_chan32.locs' 'filetype' 'autodetect'});
+eeglab redraw
+
+% Unchanged
+% ICA
+EEG_1 = pop_runica(EEG, 'runica')
+EEG_1 = eeg_checkset( EEG_1 );
+
+% Permuted samples 
+EEG_perm = EEG;
+for cc = 1:size(EEG.data, 1)
+    p = randperm(size(EEG.data, 2));
+    EEG_perm.data(cc,:) = EEG.data(cc, p);
+end
+EEG_2 = pop_runica(EEG_perm, 'runica')
+EEG_2 = eeg_checkset( EEG_2 );
+
+
+pop_selectcomps(EEG_1, [1:32] );
+title 'Non-permuted';
+pop_selectcomps(EEG_2, [1:32] );
+title 'The Ruin';
+eeglab redraw
+
+#+END_SRC
+
+
+Endeed, these components are meaningless.
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_ruin.png]]
+
+
+
+To conclude, we can do one more experiment to see what components will be produced by random data.
+
+#+NAME:  random data ICA
+#+BEGIN_SRC matlab :tangle 11_file.m
+clear; close all;
+
+X = rand(32, 30504);
+eeglab redraw
+
+EEG = pop_importdata('dataformat','array','nbchan',0,'data','X','setname','X','srate',128,'pnts',0,'xmin',0);
+[ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, 2,'gui','off'); 
+EEG = pop_chanedit(EEG, 'load',{'./eeglab_chan32.locs' 'filetype' 'autodetect'});
+
+
+% ICA
+EEG = pop_runica(EEG, 'runica')
+EEG = eeg_checkset( EEG );
+pop_selectcomps(EEG, [1:32] );
+title 'Random data';
+#+END_SRC
+
+
+#+attr_html: :width 1000px
+#+attr_latex: :width 1000px
+[[./img/ICA_rand.png]]
+
