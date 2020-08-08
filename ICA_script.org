@@ -43,10 +43,10 @@ followed by a button response ('rt' events).
 #+end_quote
 
 
-Using this dataset We will see also:
+Using this dataset we will see also:
 - that changing the order of the channels does not matter for the ICA
 - even changing the order of samples does not matter (only if each channel's samples will be reordered in the same way)
-- if you mix sample order in each channel differently you will ruin all the temporal relations between eeg signal channels
+- if you mix sample order in each channel differently you will ruin all the temporal relations between EEG signal channels
 
   
 * Basic ICA procedure
