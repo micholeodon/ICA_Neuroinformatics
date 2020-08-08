@@ -233,7 +233,7 @@ pop_eegplot(EEG_1, 1,0,0)
 [[./img/ICA_eeg_rejected_eye.png]]
 
 
-So this is a basic procedure for rejecting components. There are also so automatic classifiers available in EEGLAB.
+So this is a basic procedure for rejecting components. There are also automatic classifiers available in EEGLAB (like MARA, ADJUST).
 
 
 * Invariance of the ICA
