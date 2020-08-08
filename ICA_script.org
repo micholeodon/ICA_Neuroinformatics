@@ -73,7 +73,7 @@ eeglab
 Here is the code illustration what do I mean by changing the order of channels and samples, shown on some test two-channel signal.
 
 #+NAME:  illustration
-#+BEGIN_SRC matlab   :tangle 01_file.m
+#+BEGIN_SRC matlab   :tangle 01_file.m :class numberLines
 srate = 100; % sampling rate
 f = 4; % frequency of the x1 sine component
 T = 1;
